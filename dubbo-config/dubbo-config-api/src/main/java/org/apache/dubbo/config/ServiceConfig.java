@@ -366,12 +366,13 @@ public class ServiceConfig<T> extends AbstractServiceConfig {
     }
 
     public synchronized void export() {
+        //1. 检查并更新订阅的配置
         checkAndUpdateSubConfigs();
-
+        //2. 如果不允许暴露直接返回
         if (!shouldExport()) {
             return;
         }
-
+        //3. 如果需要延迟，启动定义其进行#doExport()，否则直接执行#doExport()
         if (shouldDelay()) {
             delayExportExecutor.schedule(this::doExport, getDelay(), TimeUnit.MILLISECONDS);
         } else {
@@ -412,6 +413,7 @@ public class ServiceConfig<T> extends AbstractServiceConfig {
         if (StringUtils.isEmpty(path)) {
             path = interfaceName;
         }
+        //核心方法
         doExportUrls();
     }
 
@@ -449,15 +451,20 @@ public class ServiceConfig<T> extends AbstractServiceConfig {
 
     @SuppressWarnings({"unchecked", "rawtypes"})
     private void doExportUrls() {
+        //加载注册中心 URL 数组
         List<URL> registryURLs = loadRegistries(true);
+        //循环 `protocols` ，向逐个注册中心分组暴露服务。
         for (ProtocolConfig protocolConfig : protocols) {
             String pathKey = URL.buildKey(getContextPath(protocolConfig).map(p -> p + "/" + path).orElse(path), group, version);
+            // ProviderModel 表示服务提供者模型，此对象中存储了与服务提供者相关的信息。
+            // 比如服务的配置信息，服务实例等。每个被导出的服务对应一个 ProviderModel。
+            // ApplicationModel 持有所有的 ProviderModel。
             ProviderModel providerModel = new ProviderModel(pathKey, ref, interfaceClass);
             ApplicationModel.initProviderModel(pathKey, providerModel);
             doExportUrlsFor1Protocol(protocolConfig, registryURLs);
         }
     }
-
+    //组装 URL
     private void doExportUrlsFor1Protocol(ProtocolConfig protocolConfig, List<URL> registryURLs) {
         String name = protocolConfig.getName();
         if (StringUtils.isEmpty(name)) {
@@ -557,6 +564,7 @@ public class ServiceConfig<T> extends AbstractServiceConfig {
             }
         }
         // export service
+        //导出服务
         String host = this.findConfigedHosts(protocolConfig, registryURLs, map);
         Integer port = this.findConfigedPorts(protocolConfig, name, map);
         URL url = new URL(name, host, port, getContextPath(protocolConfig).map(p -> p + "/" + path).orElse(path), map);
