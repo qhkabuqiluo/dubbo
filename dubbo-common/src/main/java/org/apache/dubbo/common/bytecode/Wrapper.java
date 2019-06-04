@@ -112,7 +112,8 @@ public abstract class Wrapper {
         if (c == Object.class) {
             return OBJECT_WRAPPER;
         }
-
+        // 从缓存中获取 Wrapper 实例
+        // 缓存未命中，创建 Wrapper并写入缓存
         Wrapper ret = WRAPPER_MAP.get(c);
         if (ret == null) {
             ret = makeWrapper(c);
@@ -128,18 +129,25 @@ public abstract class Wrapper {
 
         String name = c.getName();
         ClassLoader cl = ClassUtils.getClassLoader(c);
-
+        // c1 用于存储 setPropertyValue 方法代码
         StringBuilder c1 = new StringBuilder("public void setPropertyValue(Object o, String n, Object v){ ");
+        // c2 用于存储 getPropertyValue 方法代码
         StringBuilder c2 = new StringBuilder("public Object getPropertyValue(Object o, String n){ ");
+        // c3 用于存储 invokeMethod 方法代码
         StringBuilder c3 = new StringBuilder("public Object invokeMethod(Object o, String n, Class[] p, Object[] v) throws " + InvocationTargetException.class.getName() + "{ ");
 
+        // 生成类型转换代码及异常捕捉代码，比如：
+        //   DemoService w; try { w = ((DemoServcie) $1); }}catch(Throwable e){ throw new IllegalArgumentException(e); }
         c1.append(name).append(" w; try{ w = ((").append(name).append(")$1); }catch(Throwable e){ throw new IllegalArgumentException(e); }");
         c2.append(name).append(" w; try{ w = ((").append(name).append(")$1); }catch(Throwable e){ throw new IllegalArgumentException(e); }");
         c3.append(name).append(" w; try{ w = ((").append(name).append(")$1); }catch(Throwable e){ throw new IllegalArgumentException(e); }");
-
+        // pts 用于存储成员变量名和类型
         Map<String, Class<?>> pts = new HashMap<>(); // <property name, property types>
+        // ms 用于存储方法描述信息（可理解为方法签名）及 Method 实例
         Map<String, Method> ms = new LinkedHashMap<>(); // <method desc, Method instance>
+        // mns 为方法名列表
         List<String> mns = new ArrayList<>(); // method names.
+        // dmns 用于存储“定义在当前类中的方法”的名称
         List<String> dmns = new ArrayList<>(); // declaring method names.
 
         // get all public field.
@@ -149,7 +157,9 @@ public abstract class Wrapper {
             if (Modifier.isStatic(f.getModifiers()) || Modifier.isTransient(f.getModifiers())) {
                 continue;
             }
-
+            // 生成条件判断及赋值语句，比如：
+            // if( $2.equals("name") ) { w.name = (java.lang.String) $3; return;}
+            // if( $2.equals("age") ) { w.age = ((Number) $3).intValue(); return;}
             c1.append(" if( $2.equals(\"").append(fn).append("\") ){ w.").append(fn).append("=").append(arg(ft, "$3")).append("; return; }");
             c2.append(" if( $2.equals(\"").append(fn).append("\") ){ return ($w)w.").append(fn).append("; }");
             pts.put(fn, ft);
